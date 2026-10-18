@@ -10,6 +10,7 @@ default:
 		-Isrc/include \
 		src/main.c \
 		src/debug.c \
+		src/core.c  \
 		-o build/firmware.elf
 
 	avr-objcopy -O ihex -R .eeprom build/firmware.elf build/firmware.hex

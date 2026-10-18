@@ -32,7 +32,7 @@ void debug_USART_transmit(unsigned char data) {
 
 }
 
-void debug_USART_print(unsigned char *data) {
+void debug_USART_print(char *data) {
     for (uint16_t i = 0;i < 0xFFFF; i++) {
         if(data[i] != '\0') {
             debug_USART_transmit(data[i]);
