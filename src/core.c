@@ -55,6 +55,53 @@ asm volatile(                               \
 
 tcb_t *currently_running_task;
 
+// array of all registered tasks in the system. MUST be sorted by priority from highest to due to tick ISR having to have small footprint
+tcb_t *registered_tasks[configMAX_TASKS] = {0};
+
+
+// ----------------------------------------
+// scheduler
+// ----------------------------------------
+
+void tick_isr_init(void) { //inits timer2
+    TCCR2A = (1 << WGM21);               // CTC mode
+    TCCR2B = (1 << CS22);                // prescaler = 64
+    OCR2A  = 249;                        // 16MHz / 64 / 250 = 1000 Hz
+    TIMSK2 = (1 << OCIE2A);              // enable compare match A interrupt
+
+    asm volatile("sei");
+}
+
+tcb_t *priority_select_next_task(tcb_t *currently_running_task) {
+    
+}
+
+ISR(TIMER2_COMPA_vect) { // TODO algo na checkovani priorit tasku (jinak round robin)
+    uint8_t max_priority = 255;
+    uint8_t max_priority_task = 0;
+
+    for (uint8_t i = 0; i < configMAX_TASKS; i++) {
+        
+    }
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // ----------------------------------------
 // functions

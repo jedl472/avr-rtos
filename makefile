@@ -11,6 +11,7 @@ default:
 		src/main.c \
 		src/debug.c \
 		src/core.c  \
+		src/task.h	\
 		-o build/firmware.elf
 
 	avr-objcopy -O ihex -R .eeprom build/firmware.elf build/firmware.hex
