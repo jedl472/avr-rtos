@@ -9,6 +9,8 @@ asm volatile(                               \
     "push r0            \n\t"               \
     "in   r0, __SREG__  \n\t"               \
     "cli                \n\t"               \
+    "set                \n\t"               \
+    "bld  r0, 7         \n\t" /* Ensure saved SREG keeps I-bit enabled */ \
     "push r0            \n\t"               \
     "push r1            \n\t"               \
     "clr  r1            \n\t" /* C needs r1 == 0 */ \
@@ -53,10 +55,11 @@ asm volatile(                               \
 // globals
 // ----------------------------------------
 
-tcb_t *current_tcb;
+volatile tcb_t *current_tcb;
 
 // array of all registered tasks in the system. MUST be sorted by priority from highest to due to tick ISR having to have small footprint
-tcb_t *registered_tasks[configMAX_TASKS] = {NULL};
+// last position is reserved for idle task with priority coreIDLE_TASK_PRIORITYL
+tcb_t *registered_tasks[configMAX_TASKS + 1] = {NULL};
 
 
 // ----------------------------------------
@@ -76,106 +79,170 @@ void tick_isr_init(void) { //inits timer2
         1. registered_tasks is sorted from highest priority
 */
 
-tcb_t *find_next_task() {
-    task_priority_t current_priority;
-
-    if (current_tcb == NULL) {
-        current_priority = 127; 
-    } else {
-        current_priority = current_tcb->priority;
-    }
-    
-    
-    int8_t highest_ready_priority = -1;
-    
-    // -------------- find the highest READY priority --------------------
-    for(int i = 0; i < configMAX_TASKS; i++) {
-        if(registered_tasks[i] != NULL && registered_tasks[i]->state == READY) {
-            highest_ready_priority = registered_tasks[i]->priority;
+tcb_t *find_next_task(void) {
+    // ------------------------ find the current RUNNING task ----------------------
+    int8_t running_index = -1;
+    for (int i = 0; i < configMAX_TASKS; i++) {
+        if (registered_tasks[i] == current_tcb && current_tcb != NULL) {
+            running_index = i;
             break;
-        }        
-    }
-
-    // -------------- if no tasks READY -> keep current_tcb  ------------
-    if(highest_ready_priority == -1) {
-        if(current_tcb == NULL) return NULL;
-        return current_tcb;
-    }
-    
-    // -------------- if higher priority task READY, it ought to run -----
-    if(highest_ready_priority < current_priority) {
-        for(int i = 0; i < configMAX_TASKS; i++) {
-            if(registered_tasks[i] != NULL &&
-               registered_tasks[i]->state == READY &&
-               registered_tasks[i]->priority == highest_ready_priority) {
-                
-                return registered_tasks[i];
-            }
-        }        
-    }
-    
-    // -------------- round robin amongst highest priority tasks --------
-    if(highest_ready_priority == current_priority) {
-        //find currently running task index
-        int8_t currently_running_task_index;
-        for(int i = 1; i <= configMAX_TASKS; i++) {
-            if(registered_tasks[i]->state == RUNNING) {
-                currently_running_task_index = i;
-                break;
-            }
-        }
-
-
-        int8_t i;
-        for(int offset = 1; offset <= configMAX_TASKS; offset++) {
-            i = (currently_running_task_index + offset) % configMAX_TASKS;
-            
-            if(registered_tasks[i] != NULL &&
-               registered_tasks[i]->state == READY &&
-               registered_tasks[i]->priority == current_priority) {
-            
-                return registered_tasks[i];
-            }
-        
         }
     }
 
-    // -------------- else run highest priority READY task found --------
-    for(int i = 0; i < configMAX_TASKS; i++) {
-        if(registered_tasks[i] != NULL && registered_tasks[i]->state == READY) {
-            
+    // ------------------------ find highest priority RUNNING or READY task --------
+    int8_t best_priority = 127;
+    for (int i = 0; i < configMAX_TASKS; i++) {
+        if (registered_tasks[i] != NULL &&
+           (registered_tasks[i]->state == READY || registered_tasks[i]->state == RUNNING)) {
+            if (registered_tasks[i]->priority < best_priority) {
+                best_priority = registered_tasks[i]->priority;
+            }
+        }
+    }
+
+    // ------------------------ round robin after currently running task -----------
+    int start = (running_index >= 0) ? (running_index + 1) : 0;
+    for (int offset = 0; offset < configMAX_TASKS; offset++) {
+        int i = (start + offset) % configMAX_TASKS;
+        if (registered_tasks[i] != NULL &&
+           (registered_tasks[i]->state == READY || registered_tasks[i]->state == RUNNING) &&
+            registered_tasks[i]->priority == best_priority) {
             return registered_tasks[i];
+        }
+    }
+
+    // ------------------------ if no task is ready, return idle taks --------------
+    return registered_tasks[configMAX_TASKS];
+}
+
+void scheduler(void) {
+    tcb_t *next_task = find_next_task();
+    if(next_task != NULL) {
+        if(current_tcb != NULL && current_tcb->state == RUNNING) {
+            current_tcb->state = READY;
+        }
+        current_tcb = next_task;
+        current_tcb->state = RUNNING;
+    } else {
+        // TODOp0 sleep, because now god knows what will happen 
+    }
+
+}
+
+void update_suspended_tasks(void) {
+    for(int i = 0; i < configMAX_TASKS; i++) {
+        if(registered_tasks[i] != NULL && registered_tasks[i]->state == SUSPENDED) {
+            if (registered_tasks[i]->ticks_remaining_suspended > 0) {
+                registered_tasks[i]->ticks_remaining_suspended--;
+            }
+            if (registered_tasks[i]->ticks_remaining_suspended == 0) {
+                registered_tasks[i]->state = READY;
+            }
         }
     }
 }
 
 ISR(TIMER2_COMPA_vect, ISR_NAKED) { // TODOp0 pridat respektovani kriticke casti
     SAVE_CONTEXT();
-    // system_ticks++; // time keeping for SUSPENDED tasks
-    // wake_expired_delays(); // set SUSPENDED tasks to READY
-    tcb_t *next_task = find_next_task();
-    if(next_task != 0) {
-        current_tcb = next_task;
-    } else {
-        // TODOp0 sleep
-    }
-
+    // system_ticks++;
+    update_suspended_tasks();
+    scheduler();
     RESTORE_CONTEXT();
     asm volatile("reti");
 }
 
 
+// ----------------------------------------
+// idle task
+// ----------------------------------------
+
+static tcb_t idle_task_tcb;
+static uint8_t idle_task_stack[coreMINIMUM_STACK_SIZE];
+
+void idle_task(void *args) {
+    UNUSED(args);
+    while(1) {}
+}
+
 
 // ----------------------------------------
-// functions
+// core utilities
 // ----------------------------------------
 
-// void context_switch(tcb_t *task) {
-//
-// }
-//
-// void task_yield(void) {
-//     currently_running_task = currently_running_task->next_task;
-//     context_switch(currently_running_task);
-// }
+__attribute__((naked)) void start_first_task(void) {
+    RESTORE_CONTEXT();
+    asm volatile("ret");
+}
+
+void os_start(void) {
+    task_create(&idle_task_tcb, coreIDLE_TASK_PRIORITY, idle_task_stack, sizeof idle_task_stack, idle_task, NULL);    
+    debug_register_task(&idle_task_tcb, 1);
+
+    scheduler();
+    tick_isr_init();
+    start_first_task();
+}
+
+void task_suspend_ticks(tick_counter_t ticks) {
+    current_tcb->state = SUSPENDED;
+    current_tcb->ticks_remaining_suspended = ticks;
+
+    task_yield();
+}
+
+void task_exit(void) {
+    current_tcb->state = FINISHED;      
+    for (;;) {
+        task_yield();                      
+    }
+}
+
+void debug_register_task(tcb_t *task, uint8_t pos) {
+    registered_tasks[pos] = task;
+}
+
+// ----------------------------------------
+// task utilities
+// ----------------------------------------
+
+__attribute__((naked)) void task_yield(void) {
+    SAVE_CONTEXT();
+    scheduler();
+    RESTORE_CONTEXT();
+    asm volatile("ret");
+}
+
+void task_create(tcb_t *tcb, task_priority_t priority, uint8_t *stack, uint16_t size,
+                 void (*fn)(void *), void *arg) {
+    
+    uint8_t *sp = stack + size - 1;     // highest box of the stack array
+
+    // Safety net: if the task function ever returns, it lands in task_exit
+    uint16_t exit_addr = (uint16_t)task_exit;
+    *sp-- = exit_addr & 0xFF;
+    *sp-- = exit_addr >> 8;
+
+    // 1-2: where the task starts (what reti will load into the program counter)
+    uint16_t start = (uint16_t)fn;
+    *sp-- = start & 0xFF;               // low byte, higher address
+    *sp-- = start >> 8;                 // high byte, lower address
+
+    *sp-- = 0x00;                       // 3: r0
+    *sp-- = 0x80;                       // 4: SREG, bit 7 = interrupts enabled
+    *sp-- = 0x00;                       // 5: r1, must be zero for C code
+
+    for (uint8_t r = 2; r <= 31; r++) { // 6: r2 ... r31
+        uint16_t a = (uint16_t)arg;
+        if      (r == 24) *sp-- = a & 0xFF;   // first argument, low byte
+        else if (r == 25) *sp-- = a >> 8;     // first argument, high byte
+        else              *sp-- = 0x00;
+    }
+
+    tcb->sp = sp;                         // next free box, as a real stack pointer would be
+    tcb->priority = priority;
+    tcb->state = READY;
+    tcb->ticks_remaining_suspended = 0;
+}
+
+
 
