@@ -53,10 +53,10 @@ asm volatile(                               \
 // globals
 // ----------------------------------------
 
-tcb_t *currently_running_task;
+tcb_t *current_tcb;
 
 // array of all registered tasks in the system. MUST be sorted by priority from highest to due to tick ISR having to have small footprint
-tcb_t *registered_tasks[configMAX_TASKS] = {0};
+tcb_t *registered_tasks[configMAX_TASKS] = {NULL};
 
 
 // ----------------------------------------
@@ -72,34 +72,97 @@ void tick_isr_init(void) { //inits timer2
     asm volatile("sei");
 }
 
-tcb_t *priority_select_next_task(tcb_t *currently_running_task) {
+/* prerequisities for the scheduler to work: 
+        1. registered_tasks is sorted from highest priority
+*/
+
+tcb_t *find_next_task() {
+    task_priority_t current_priority;
+
+    if (current_tcb == NULL) {
+        current_priority = 127; 
+    } else {
+        current_priority = current_tcb->priority;
+    }
     
-}
-
-ISR(TIMER2_COMPA_vect) { // TODO algo na checkovani priorit tasku (jinak round robin)
-    uint8_t max_priority = 255;
-    uint8_t max_priority_task = 0;
-
-    for (uint8_t i = 0; i < configMAX_TASKS; i++) {
-        
+    
+    int8_t highest_ready_priority = -1;
+    
+    // -------------- find the highest READY priority --------------------
+    for(int i = 0; i < configMAX_TASKS; i++) {
+        if(registered_tasks[i] != NULL && registered_tasks[i]->state == READY) {
+            highest_ready_priority = registered_tasks[i]->priority;
+            break;
+        }        
     }
 
+    // -------------- if no tasks READY -> keep current_tcb  ------------
+    if(highest_ready_priority == -1) {
+        if(current_tcb == NULL) return NULL;
+        return current_tcb;
+    }
+    
+    // -------------- if higher priority task READY, it ought to run -----
+    if(highest_ready_priority < current_priority) {
+        for(int i = 0; i < configMAX_TASKS; i++) {
+            if(registered_tasks[i] != NULL &&
+               registered_tasks[i]->state == READY &&
+               registered_tasks[i]->priority == highest_ready_priority) {
+                
+                return registered_tasks[i];
+            }
+        }        
+    }
+    
+    // -------------- round robin amongst highest priority tasks --------
+    if(highest_ready_priority == current_priority) {
+        //find currently running task index
+        int8_t currently_running_task_index;
+        for(int i = 1; i <= configMAX_TASKS; i++) {
+            if(registered_tasks[i]->state == RUNNING) {
+                currently_running_task_index = i;
+                break;
+            }
+        }
+
+
+        int8_t i;
+        for(int offset = 1; offset <= configMAX_TASKS; offset++) {
+            i = (currently_running_task_index + offset) % configMAX_TASKS;
+            
+            if(registered_tasks[i] != NULL &&
+               registered_tasks[i]->state == READY &&
+               registered_tasks[i]->priority == current_priority) {
+            
+                return registered_tasks[i];
+            }
+        
+        }
+    }
+
+    // -------------- else run highest priority READY task found --------
+    for(int i = 0; i < configMAX_TASKS; i++) {
+        if(registered_tasks[i] != NULL && registered_tasks[i]->state == READY) {
+            
+            return registered_tasks[i];
+        }
+    }
 }
 
+ISR(TIMER2_COMPA_vect, ISR_NAKED) { // TODOp0 pridat respektovani kriticke casti
+    SAVE_CONTEXT();
+    // system_ticks++; // time keeping for SUSPENDED tasks
+    // wake_expired_delays(); // set SUSPENDED tasks to READY
+    tcb_t *next_task = find_next_task();
+    if(next_task != 0) {
+        current_tcb = next_task;
+    } else {
+        // TODOp0 sleep
+    }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+    RESTORE_CONTEXT();
+    asm volatile("reti");
+}
 
 
 
@@ -107,12 +170,12 @@ ISR(TIMER2_COMPA_vect) { // TODO algo na checkovani priorit tasku (jinak round r
 // functions
 // ----------------------------------------
 
-void context_switch(tcb_t *task) {
-
-}
-
-void task_yield(void) {
-    currently_running_task = currently_running_task->next_task;
-    context_switch(currently_running_task);
-}
+// void context_switch(tcb_t *task) {
+//
+// }
+//
+// void task_yield(void) {
+//     currently_running_task = currently_running_task->next_task;
+//     context_switch(currently_running_task);
+// }
 
