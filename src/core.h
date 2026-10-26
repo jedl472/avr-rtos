@@ -7,12 +7,14 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
+#include "debug.h"
+
 
 #define UNUSED(x) (void)(x) // to supress -Wunused-parameter with creating tasks
 
 
 
-#define configMAX_TASKS 1
+#define configMAX_TASKS 6
 #define coreMINIMUM_STACK_SIZE 128 // TODO find out this value fr
 #define coreIDLE_TASK_PRIORITY 127
 
@@ -50,8 +52,10 @@ void os_start(void);
 
 void debug_register_task(tcb_t *task, uint8_t pos);
 
+void task_register(tcb_t *tcb);
 
 
+extern tcb_t *registered_tasks[configMAX_TASKS];  // TODO remove
 
 typedef enum kp_type {
     STACK_OVERFLOW, // TODO

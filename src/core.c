@@ -178,7 +178,7 @@ __attribute__((naked)) void start_first_task(void) {
 
 void os_start(void) {
     task_create(&idle_task_tcb, coreIDLE_TASK_PRIORITY, idle_task_stack, sizeof idle_task_stack, idle_task, NULL);    
-    debug_register_task(&idle_task_tcb, 1);
+    task_register(&idle_task_tcb);
 
     scheduler();
     tick_isr_init();
@@ -248,7 +248,29 @@ void task_create(tcb_t *tcb, task_priority_t priority, uint8_t *stack, uint16_t 
 
 
 void task_register(tcb_t *tcb) {
+    debug_USART_print("registering task of priority: ");
+    debug_USART_transmit(tcb->priority + '0');
+    debug_USART_print("\n");
+    if (registered_tasks[configMAX_TASKS - 1] != NULL) throw_kp(EXCEEDED_MAX_TASKS);
     
+    if (registered_tasks[0] == NULL) {
+        registered_tasks[0] = tcb;
+        return;
+    }
+
+    uint8_t pos;
+    for(int i = 0; i < configMAX_TASKS; i++) {
+        if(registered_tasks[i] == NULL || registered_tasks[i]->priority >= tcb->priority) {
+            pos = i;
+            break;
+        }
+    }
+
+    for(int i = configMAX_TASKS - 1; i >= pos; i--) {
+        if(registered_tasks[i] != NULL) registered_tasks[i + 1] = registered_tasks[i];
+    }
+
+    registered_tasks[pos] = tcb;
 }
 
 // ----------------------------------------
@@ -257,9 +279,14 @@ void task_register(tcb_t *tcb) {
 
 void throw_kp(kp_type_t kp_type) {
     // send out the error somehow
-    UNUSED(kp_type);
+    // UNUSED(kp_type);
     // or not
     
+    debug_USART_print("KERNEL PANIC!\nerror code: ");
+    debug_USART_transmit(kp_type + '0');
+    debug_USART_transmit('\n');
+    
+
     asm volatile("cli");  // disable interrupts    
 
     while(1) {}

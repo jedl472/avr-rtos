@@ -26,6 +26,14 @@ void blink_task(void *args) {
 }
 
 
+void print_registered_tasks() {
+    for (int i = 0; i < configMAX_TASKS; i++) {
+       if(registered_tasks[i] == NULL) debug_USART_transmit('n');
+       else debug_USART_transmit(registered_tasks[i]->priority + '0');
+
+       debug_USART_print("\n");
+    }    
+}
 
 
 int main(void)
@@ -33,11 +41,12 @@ int main(void)
     //debug init
     DDRB |= (1 << PB5);  // PB0 output
     debug_USART_init(UBRR);
-    debug_USART_print("""Hello world xoxo\n""");
-        
+    
+            
+    debug_USART_print("""Hello world xoxo ver2\n""");
     task_create(&blink_task_tcb, 0, blink_task_stack, sizeof(blink_task_stack), blink_task, NULL);
-        debug_register_task(&blink_task_tcb, 0);
-        
+    task_register(&blink_task_tcb);
+
 
     os_start();
 }
