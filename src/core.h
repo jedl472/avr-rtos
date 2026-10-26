@@ -49,5 +49,16 @@ void os_start(void);
 
 void debug_register_task(tcb_t *task, uint8_t pos);
 
+
+
+
+typedef enum kp_type {
+    STACK_OVERFLOW, // TODO
+    EXCEEDED_MAX_TASKS, // user error - means user tried to register more tasks than configMAX_TASKS
+    CORRUPTED_IDLE_TASK // internal error - means scheduler did not find suitable task to run
+} kp_type_t;
+
+void throw_kp(kp_type_t kp_type);
+
 #endif // !CORE_H
 

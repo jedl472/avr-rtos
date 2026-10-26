@@ -124,7 +124,8 @@ void scheduler(void) {
         current_tcb = next_task;
         current_tcb->state = RUNNING;
     } else {
-        // TODOp0 sleep, because now god knows what will happen 
+        // shouldn't be reachable, so being here means scheduler did not find IDLE task_create
+        throw_kp(CORRUPTED_IDLE_TASK);
     }
 
 }
@@ -245,4 +246,19 @@ void task_create(tcb_t *tcb, task_priority_t priority, uint8_t *stack, uint16_t 
 }
 
 
+void task_register(tcb_t *tcb) {
+    
+}
 
+// ----------------------------------------
+// error handling
+// ----------------------------------------
+
+void throw_kp(kp_type_t kp_type) {
+    // send out the error somehow
+    // or not
+    
+    asm volatile("cli");  // disable interrupts    
+
+    while(1) {}
+}
