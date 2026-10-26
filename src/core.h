@@ -31,12 +31,13 @@ typedef enum task_state {
 typedef struct tcb {
     uint8_t *sp;
     task_state_t state;
-    uint8_t id; //yet unused
+    uint8_t id; // unused
     task_priority_t priority;   // 0 is the highest
     
     tick_counter_t ticks_remaining_suspended;
 
 } tcb_t;
+
 
 __attribute__((naked)) void task_yield(void);
 

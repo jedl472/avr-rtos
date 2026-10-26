@@ -58,8 +58,22 @@ asm volatile(                               \
 volatile tcb_t *current_tcb;
 
 // array of all registered tasks in the system. MUST be sorted by priority from highest to due to tick ISR having to have small footprint
-// last position is reserved for idle task with priority coreIDLE_TASK_PRIORITYL
-tcb_t *registered_tasks[configMAX_TASKS + 1] = {NULL};
+tcb_t *registered_tasks[configMAX_TASKS] = {NULL};
+
+
+
+// ----------------------------------------
+// idle task
+// ----------------------------------------
+
+static tcb_t idle_task_tcb;
+static uint8_t idle_task_stack[coreMINIMUM_STACK_SIZE];
+
+void idle_task(void *args) {
+    UNUSED(args);
+    while(1) {}
+}
+
 
 
 // ----------------------------------------
@@ -112,7 +126,7 @@ tcb_t *find_next_task(void) {
     }
 
     // ------------------------ if no task is ready, return idle taks --------------
-    return registered_tasks[configMAX_TASKS];
+    return &idle_task_tcb;
 }
 
 void scheduler(void) {
@@ -124,7 +138,7 @@ void scheduler(void) {
         current_tcb = next_task;
         current_tcb->state = RUNNING;
     } else {
-        // shouldn't be reachable, so being here means scheduler did not find IDLE task_create
+        // shouldn't be reachable, so being here means scheduler did not find READY idle tas
         throw_kp(CORRUPTED_IDLE_TASK);
     }
 
@@ -150,19 +164,6 @@ ISR(TIMER2_COMPA_vect, ISR_NAKED) { // TODOp0 pridat respektovani kriticke casti
     scheduler();
     RESTORE_CONTEXT();
     asm volatile("reti");
-}
-
-
-// ----------------------------------------
-// idle task
-// ----------------------------------------
-
-static tcb_t idle_task_tcb;
-static uint8_t idle_task_stack[coreMINIMUM_STACK_SIZE];
-
-void idle_task(void *args) {
-    UNUSED(args);
-    while(1) {}
 }
 
 
@@ -199,7 +200,7 @@ void task_exit(void) {
 }
 
 void debug_register_task(tcb_t *task, uint8_t pos) {
-    registered_tasks[pos] = task;
+    registered_tasks[pos] = task;  // throws -Warray-bounds and that is perfectly fine
 }
 
 // ----------------------------------------
@@ -256,6 +257,7 @@ void task_register(tcb_t *tcb) {
 
 void throw_kp(kp_type_t kp_type) {
     // send out the error somehow
+    UNUSED(kp_type);
     // or not
     
     asm volatile("cli");  // disable interrupts    
