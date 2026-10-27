@@ -52,6 +52,13 @@ asm volatile(                               \
 )
 
 // ----------------------------------------
+// "private" implicit declarations
+// ----------------------------------------
+
+void check_stack_canary(tcb_t *task);
+
+
+// ----------------------------------------
 // globals
 // ----------------------------------------
 
@@ -159,6 +166,7 @@ void update_suspended_tasks(void) {
 
 ISR(TIMER2_COMPA_vect, ISR_NAKED) { // TODOp0 pridat respektovani kriticke casti
     SAVE_CONTEXT();
+    check_stack_canary((tcb_t*)current_tcb);
     // system_ticks++;
     update_suspended_tasks();
     scheduler();
@@ -203,6 +211,12 @@ void debug_register_task(tcb_t *task, uint8_t pos) {
     registered_tasks[pos] = task;  // throws -Warray-bounds and that is perfectly fine
 }
 
+void check_stack_canary(tcb_t *task) {
+    if(*(task->last_stack_addr) != coreSTACK_CANARY_VALUE) {
+        throw_kp(STACK_OVERFLOW);
+    }
+}
+
 // ----------------------------------------
 // task utilities
 // ----------------------------------------
@@ -244,6 +258,11 @@ void task_create(tcb_t *tcb, task_priority_t priority, uint8_t *stack, uint16_t 
     tcb->priority = priority;
     tcb->state = READY;
     tcb->ticks_remaining_suspended = 0;
+
+    tcb->stack_size = size;
+    tcb->last_stack_addr = stack;
+
+    *stack = coreSTACK_CANARY_VALUE; // stack canary setup - the only place where that address should be written to
 }
 
 

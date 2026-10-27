@@ -15,8 +15,10 @@
 
 
 #define configMAX_TASKS 6
+
 #define coreMINIMUM_STACK_SIZE 128 // TODO find out this value fr
 #define coreIDLE_TASK_PRIORITY 127
+#define coreSTACK_CANARY_VALUE 0xAA
 
 // reserved values: 127 - coreIDLE_TASK_PRIORITY
 typedef int8_t task_priority_t;
@@ -37,6 +39,9 @@ typedef struct tcb {
     task_priority_t priority;   // 0 is the highest
     
     tick_counter_t ticks_remaining_suspended;
+
+    uint16_t stack_size;
+    uint8_t *last_stack_addr;
 
 } tcb_t;
 
