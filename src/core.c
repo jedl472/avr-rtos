@@ -55,7 +55,7 @@ asm volatile(                               \
 // "private" implicit declarations
 // ----------------------------------------
 
-void check_stack_canary(tcb_t *task);
+void check_stack_bounds(tcb_t *task);
 
 
 // ----------------------------------------
@@ -166,7 +166,7 @@ void update_suspended_tasks(void) {
 
 ISR(TIMER2_COMPA_vect, ISR_NAKED) { // TODOp0 pridat respektovani kriticke casti
     SAVE_CONTEXT();
-    check_stack_canary((tcb_t*)current_tcb);
+    check_stack_bounds((tcb_t*)current_tcb);
     // system_ticks++;
     update_suspended_tasks();
     scheduler();
@@ -211,8 +211,12 @@ void debug_register_task(tcb_t *task, uint8_t pos) {
     registered_tasks[pos] = task;  // throws -Warray-bounds and that is perfectly fine
 }
 
-void check_stack_canary(tcb_t *task) {
-    if(*(task->last_stack_addr) != coreSTACK_CANARY_VALUE) {
+void check_stack_bounds(tcb_t *task) {
+    if(*(task->stack_base) != coreSTACK_CANARY_VALUE) {
+        throw_kp(STACK_OVERFLOW);
+    }
+
+    if(task->sp <= task->stack_base || (uintptr_t)current_tcb->sp > RAMEND) {
         throw_kp(STACK_OVERFLOW);
     }
 }
@@ -233,7 +237,7 @@ void task_create(tcb_t *tcb, task_priority_t priority, uint8_t *stack, uint16_t 
     
     uint8_t *sp = stack + size - 1;     // highest box of the stack array
 
-    // Safety net: if the task function ever returns, it lands in task_exit
+    // if the task function ever returns, land in task_exit
     uint16_t exit_addr = (uint16_t)task_exit;
     *sp-- = exit_addr & 0xFF;
     *sp-- = exit_addr >> 8;
@@ -260,16 +264,16 @@ void task_create(tcb_t *tcb, task_priority_t priority, uint8_t *stack, uint16_t 
     tcb->ticks_remaining_suspended = 0;
 
     tcb->stack_size = size;
-    tcb->last_stack_addr = stack;
+    tcb->stack_base = stack;
 
     *stack = coreSTACK_CANARY_VALUE; // stack canary setup - the only place where that address should be written to
 }
 
 
 void task_register(tcb_t *tcb) {
-    debug_USART_print("registering task of priority: ");
-    debug_USART_transmit(tcb->priority + '0');
-    debug_USART_print("\n");
+    // debug_USART_print("registering task of priority: ");
+    // debug_USART_transmit(tcb->priority + '0');
+    // debug_USART_print("\n");
     if (registered_tasks[configMAX_TASKS - 1] != NULL) throw_kp(EXCEEDED_MAX_TASKS);
     
     if (registered_tasks[0] == NULL) {

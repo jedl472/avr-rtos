@@ -18,7 +18,7 @@
 
 #define coreMINIMUM_STACK_SIZE 128 // TODO find out this value fr
 #define coreIDLE_TASK_PRIORITY 127
-#define coreSTACK_CANARY_VALUE 0xAA
+#define coreSTACK_CANARY_VALUE 0x67
 
 // reserved values: 127 - coreIDLE_TASK_PRIORITY
 typedef int8_t task_priority_t;
@@ -41,7 +41,7 @@ typedef struct tcb {
     tick_counter_t ticks_remaining_suspended;
 
     uint16_t stack_size;
-    uint8_t *last_stack_addr;
+    uint8_t *stack_base;
 
 } tcb_t;
 
@@ -69,7 +69,7 @@ typedef enum kp_type {
     CORRUPTED_IDLE_TASK, // kernel error - means scheduler did not find suitable task to run
 
     //queue errors
-    QUEUE_OVERFLOW // user error - tried to queue_add on a full queue
+    QUEUE_OVERFLOW, // user error - tried to queue_add on a full queue
     POP_ON_EMPTY_QUEUE // kernel error - called queue_pop on an empty queue
 } kp_type_t;
 

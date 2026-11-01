@@ -6,7 +6,7 @@
 #include "config.h"
 #include "core.h"
 
-typedef uint8_t queue_element_t;
+typedef int8_t queue_element_t;
 
 typedef struct queue {
     const queue_element_t *head; // pointer to the begining of queue storage area

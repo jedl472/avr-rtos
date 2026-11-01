@@ -41,3 +41,42 @@ void debug_USART_print(char *data) {
         }
     }
 }
+
+void debug_USART_print_int(int value) {
+    char buffer[7];  // Enough for -32768 + '\0'
+    int i = 0;
+
+    // Handle negative numbers
+    if (value < 0) {
+        debug_USART_transmit('-');
+        value = -value;
+    }
+
+    // Special case for zero
+    if (value == 0) {
+        debug_USART_transmit('0');
+        return;
+    }
+
+    // Extract digits in reverse order
+    while (value > 0) {
+        buffer[i++] = '0' + (value % 10);
+        value /= 10;
+    }
+
+    // Send digits in correct order
+    while (i > 0) {
+        debug_USART_transmit(buffer[--i]);
+    }
+}
+
+void debug_USART_print_hex(uint16_t value) {
+    const char hex[] = "0123456789ABCDEF";
+
+    debug_USART_transmit('0');
+    debug_USART_transmit('x');
+
+    for (int i = 3; i >= 0; i--) {
+        debug_USART_transmit(hex[(value >> (i * 4)) & 0xF]);
+    }
+}
