@@ -63,9 +63,14 @@ void task_register(tcb_t *tcb);
 extern tcb_t *registered_tasks[configMAX_TASKS];  // TODO remove
 
 typedef enum kp_type {
+    //core errors
     STACK_OVERFLOW, // TODO
     EXCEEDED_MAX_TASKS, // user error - means user tried to register more tasks than configMAX_TASKS
-    CORRUPTED_IDLE_TASK // internal error - means scheduler did not find suitable task to run
+    CORRUPTED_IDLE_TASK, // kernel error - means scheduler did not find suitable task to run
+
+    //queue errors
+    QUEUE_OVERFLOW // user error - tried to queue_add on a full queue
+    POP_ON_EMPTY_QUEUE // kernel error - called queue_pop on an empty queue
 } kp_type_t;
 
 void throw_kp(kp_type_t kp_type);
