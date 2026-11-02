@@ -281,7 +281,7 @@ void task_register(tcb_t *tcb) {
         return;
     }
 
-    uint8_t pos;
+    uint8_t pos = 0; // initialized to 0 to supress -Wmaybe-uninitialized
     for(int i = 0; i < configMAX_TASKS; i++) {
         if(registered_tasks[i] == NULL || registered_tasks[i]->priority >= tcb->priority) {
             pos = i;

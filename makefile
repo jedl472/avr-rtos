@@ -12,6 +12,7 @@ default:
 		src/debug.c \
 		src/core.c  \
 		src/queue.c	\
+		src/tests.c \
 		-o build/firmware.elf
 
 	avr-objcopy -O ihex -R .eeprom build/firmware.elf build/firmware.hex
