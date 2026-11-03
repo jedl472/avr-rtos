@@ -1,0 +1,8 @@
+CompileFlags:
+  Add:
+    - -target
+    - avr
+    - -mmcu=atmega328p         # Change to your target MCU
+    - -DF_CPU=16000000UL       # Change to your clock frequency
+    - -I/usr/lib/gcc/avr/16.2.0/include       # Path to avr-libc headers (adjust if different)
+    - -I./src              # Local header directories
