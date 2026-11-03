@@ -4,6 +4,10 @@
 // macros
 // ----------------------------------------
 
+#define ENTER_CRITICAL() uint8_t _sreg = SREG; asm volatile("cli")
+
+#define EXIT_CRITICAL() SREG = _sreg
+
 #define SAVE_CONTEXT()                      \
 asm volatile(                               \
     "push r0            \n\t"               \
