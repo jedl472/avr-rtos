@@ -1,20 +1,25 @@
 #ifndef QUEUE_H
 #define QUEUE_H
 
+#include <stdint.h>
 #include <string.h>
 
 #include "config.h"
 #include "core.h"
 
-typedef int8_t queue_element_t;
+// macro that will calculate size of queue buffer to allocate - exists to compensate for popped_item_buffer
+#define QUEUE_BUFFER_SIZE(item_size, capacity) \
+    ((size_t)(item_size) * (size_t)(capacity + 1))
 
 typedef struct queue {
-    const queue_element_t *head; // pointer to the begining of queue storage area
-    queue_element_t *write_to; // next free field
-    queue_element_t *popped_element_storage;
-    const uint8_t max_capacity;
-    uint8_t number_of_elements;
-    size_t element_size;
+    uint8_t *head;      // pointer to the begining of queue storage area
+    size_t item_size;   // size of item in byte
+    uint8_t capacity;   // max number of items
+    uint8_t *write_to;  // pointer of the next free space in the queue
+    uint8_t count;      // number of items in the queue
+    uint8_t *popped_item_buffer; // buffer where popped elements go
+    
+    flag_t flag;        // flag used by the scheduler to wake up tasks
 } queue_t;
 
 #endif // !QUEUE_H

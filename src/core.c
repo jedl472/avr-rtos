@@ -157,11 +157,16 @@ void scheduler(void) {
 
 void update_suspended_tasks(void) {
     for(int i = 0; i < configMAX_TASKS; i++) {
-        if(registered_tasks[i] != NULL && registered_tasks[i]->state == SUSPENDED) {
+        if(registered_tasks[i] == NULL) break;
+        if(registered_tasks[i]->state == SUSPENDED) {
             if (registered_tasks[i]->ticks_remaining_suspended > 0) {
                 registered_tasks[i]->ticks_remaining_suspended--;
             }
             if (registered_tasks[i]->ticks_remaining_suspended == 0) {
+                registered_tasks[i]->state = READY;
+            }
+        } else if(registered_tasks[i]->state == BLOCKED) {
+            if(*(registered_tasks[i]->waiting_on_flag->count) != 0) {
                 registered_tasks[i]->state = READY;
             }
         }
