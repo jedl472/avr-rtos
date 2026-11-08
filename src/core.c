@@ -1,9 +1,14 @@
 #include "core.h"
+#include "config.h"
 
 // ----------------------------------------
-// macros
+// private macros
 // ----------------------------------------
 
+// 64 means prescaler value (set in tick_isr_init)
+// example: 16MHz / 64 / 250 = 1000 Hz
+#define  CALCULATE_OCR2A(tick_frequency, cpu_frequency) \
+    ((uint8_t)(cpu_frequency / tick_frequency / 64))
 
 #define SAVE_CONTEXT()                      \
 asm volatile(                               \
@@ -53,7 +58,7 @@ asm volatile(                               \
 )
 
 // ----------------------------------------
-// "private" implicit declarations
+// private implicit declarations
 // ----------------------------------------
 
 void check_stack_bounds(tcb_t *task);
@@ -68,7 +73,7 @@ volatile tcb_t *current_tcb;
 // array of all registered tasks in the system. MUST be sorted by priority from highest to due to tick ISR having to have small footprint
 tcb_t *registered_tasks[configMAX_TASKS] = {NULL};
 
-
+tick_counter_t os_ticks = 0;
 
 // ----------------------------------------
 // idle task
@@ -91,7 +96,7 @@ void idle_task(void *args) {
 void tick_isr_init(void) { //inits timer2
     TCCR2A = (1 << WGM21);               // CTC mode
     TCCR2B = (1 << CS22);                // prescaler = 64
-    OCR2A  = 249;                        // 16MHz / 64 / 250 = 1000 Hz
+    OCR2A  = CALCULATE_OCR2A(configOS_TICK_FREQ, configCPU_FREQ);   //value to compare against
     TIMSK2 = (1 << OCIE2A);              // enable compare match A interrupt
 
     asm volatile("sei");
@@ -173,7 +178,7 @@ void update_suspended_tasks(void) {
 ISR(TIMER2_COMPA_vect, ISR_NAKED) { // TODOp0 pridat respektovani kriticke casti
     SAVE_CONTEXT();
     check_stack_bounds((tcb_t*)current_tcb);
-    // system_ticks++;
+    // os_ticks++;
     update_suspended_tasks();
     scheduler();
     RESTORE_CONTEXT();
@@ -233,6 +238,8 @@ void check_stack_bounds(tcb_t *task) {
 
 __attribute__((naked)) void task_yield(void) {
     SAVE_CONTEXT();
+    check_stack_bounds((tcb_t*)current_tcb);
+    update_suspended_tasks();
     scheduler();
     RESTORE_CONTEXT();
     asm volatile("ret");

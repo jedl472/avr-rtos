@@ -8,17 +8,13 @@
 #include <avr/interrupt.h>
 
 #include "debug.h"
+#include "config.h"
 
 
 #define coreENTER_CRITICAL() uint8_t _sreg = SREG; asm volatile("cli")
 #define coreEXIT_CRITICAL() SREG = _sreg
 
-
 #define UNUSED(x) (void)(x) // to supress -Wunused-parameter with creating tasks
-
-
-
-#define configMAX_TASKS 6
 
 #define coreMINIMUM_STACK_SIZE 128 // TODO find out this value fr
 #define coreIDLE_TASK_PRIORITY 127
@@ -28,6 +24,9 @@
 // reserved values: 127 - coreIDLE_TASK_PRIORITY
 typedef int8_t task_priority_t;
 typedef uint16_t tick_counter_t;
+
+// incremented by tick_isr - for debug purposes only
+extern tick_counter_t os_ticks;
 
 // Interface for queue-like structures to use for unblocking tasks.
 // If not zero, task gets woken up.
