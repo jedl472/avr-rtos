@@ -18,7 +18,7 @@ void bind_queue_to_task(queue_t *q, tcb_t *task) {
     task->waiting_on_flag = &(q->flag);
 }
 
-void queue_add(queue_t *q, void *item_to_add) {
+void queue_send(queue_t *q, void *item_to_add) {
     #if configVOID_ELEMENTS_ADDED_TO_FULL_QUEUE
         if(q->capacity == q->count) {
             return;
@@ -29,7 +29,6 @@ void queue_add(queue_t *q, void *item_to_add) {
         }
     #endif
 
-    debug_USART_print("queue add called\n");
     coreENTER_CRITICAL();
     
     memcpy((void*)(q->write_to), item_to_add, q->item_size);
@@ -38,6 +37,23 @@ void queue_add(queue_t *q, void *item_to_add) {
     q->count++;
 
     coreEXIT_CRITICAL();
+}
+
+void queue_send_from_isr(queue_t *q, void *item_to_add) {
+    #if configVOID_ELEMENTS_ADDED_TO_FULL_QUEUE
+        if(q->capacity == q->count) {
+            return;
+        }
+    #else 
+        if(q->capacity == q->count) {
+            throw_kp(QUEUE_OVERFLOW);
+        }
+    #endif
+
+    memcpy((void*)(q->write_to), item_to_add, q->item_size);
+    
+    q->write_to += q->item_size;
+    q->count++;
 }
 
 void *queue_pop(queue_t *q) {

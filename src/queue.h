@@ -24,7 +24,9 @@ typedef struct queue {
 
 void queue_init(queue_t *q, uint8_t *head, size_t item_size, uint8_t capacity);
 
-void queue_add(queue_t *q, void *item_to_add);
+void queue_send(queue_t *q, void *item_to_add);
+
+void queue_send_from_isr(queue_t *q, void *item_to_add);
 
 void *queue_pop(queue_t *q);
 

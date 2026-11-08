@@ -19,3 +19,5 @@ TODO:
     - add documentation inside header files
 
     - add queue ring buffer
+
+    - add higher_priority_task_woken to queue_send

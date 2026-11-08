@@ -16,19 +16,7 @@ void task_sender(void *args) {
 
     while(1) {
         coreENTER_CRITICAL();
-        queue_add(tq_handle, &i);
-        queue_add(tq_handle, &i);
-        queue_add(tq_handle, &i);
-        queue_add(tq_handle, &i);
-        queue_add(tq_handle, &i);
-        queue_add(tq_handle, &i);
-        queue_add(tq_handle, &i);
-        queue_add(tq_handle, &i);
-        queue_add(tq_handle, &i);
-        queue_add(tq_handle, &i);
-        queue_add(tq_handle, &i);
-        queue_add(tq_handle, &i);
-        queue_add(tq_handle, &i);
+        queue_send(tq_handle, &i);
         coreEXIT_CRITICAL();
         debug_USART_print("sending data to queue\n waiting_on_flag val: ");
         debug_USART_print_int(*task_receiver_tcb.waiting_on_flag->count);
