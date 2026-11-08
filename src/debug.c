@@ -33,6 +33,7 @@ void debug_USART_transmit(unsigned char data) {
 }
 
 void debug_USART_print(char *data) {
+    uint8_t _sreg = SREG; asm volatile("cli");  //ENTER_CRITICAL
     for (uint16_t i = 0;i < 0xFFFF; i++) {
         if(data[i] != '\0') {
             debug_USART_transmit(data[i]);
@@ -40,6 +41,7 @@ void debug_USART_print(char *data) {
             break;
         }
     }
+    SREG = _sreg;                               //EXIT_CRITICAL
 }
 
 void debug_USART_print_int(int value) {

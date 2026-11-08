@@ -10,6 +10,10 @@
 #include "debug.h"
 
 
+#define coreENTER_CRITICAL() uint8_t _sreg = SREG; asm volatile("cli")
+#define coreEXIT_CRITICAL() SREG = _sreg
+
+
 #define UNUSED(x) (void)(x) // to supress -Wunused-parameter with creating tasks
 
 

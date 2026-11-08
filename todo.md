@@ -17,3 +17,5 @@ TODO:
     - revision of debug.c
 
     - add documentation inside header files
+
+    - add queue ring buffer
