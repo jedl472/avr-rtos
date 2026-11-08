@@ -5,6 +5,7 @@
 #include <avr/io.h>
 #include <util/delay.h>
 
+#define CALCULATE_UBRR(baud_rate) ((F_CPU / 16 / (baud_rate)) - 1)
 
 void debug_blink_lockout(void);
 

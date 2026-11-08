@@ -13,6 +13,7 @@ default:
 		src/core.c  \
 		src/queue.c	\
 		src/tests.c \
+		src/tests/tests_queue.c \
 		-o build/firmware.elf
 
 	avr-objcopy -O ihex -R .eeprom build/firmware.elf build/firmware.hex

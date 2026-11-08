@@ -22,4 +22,12 @@ typedef struct queue {
     flag_t flag;        // flag used by the scheduler to wake up tasks
 } queue_t;
 
+void queue_init(queue_t *q, uint8_t *head, size_t item_size, uint8_t capacity);
+
+void queue_add(queue_t *q, void *item_to_add);
+
+void *queue_pop(queue_t *q);
+
+void suspend_until_queue_receive(queue_t *q);
+
 #endif // !QUEUE_H

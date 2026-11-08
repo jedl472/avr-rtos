@@ -2,13 +2,9 @@
 
 
 #include "debug.h"
-#define BAUD 9600
-#define UBRR F_CPU/16/BAUD-1
-
 
 #include "core.h"
 #include "queue.h"
-#include "tests.h"
 
 
 
@@ -31,7 +27,7 @@ int main(void)
 {
     // //debug init
     // DDRB |= (1 << PB5);  // PB0 output
-    debug_USART_init(UBRR);
+    debug_USART_init(CALCULATE_UBRR(9600));
     //
     // //
     // // debug_USART_print("""Hello world xoxo ver2\n""");
