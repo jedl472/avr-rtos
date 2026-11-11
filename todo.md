@@ -21,3 +21,5 @@ TODO:
     - add queue ring buffer
 
     - add higher_priority_task_woken to queue_send
+
+    - move large constants into PROGMEM
