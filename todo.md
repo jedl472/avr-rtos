@@ -23,3 +23,5 @@ TODO:
     - add higher_priority_task_woken to queue_send
 
     - move large constants into PROGMEM
+
+    - make small functions inline
