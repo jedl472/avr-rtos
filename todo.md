@@ -1,4 +1,5 @@
 TODO:
+    
     - rewrite queue.c for it to require only one function to call for initialization 
       and also there should not be type mess with queue item
     
@@ -6,13 +7,9 @@ TODO:
     
     - fix messy naming of core functions
     
-    - fix task initialization for it to not require manual stack setup
-
     - add system ticks data type and counting (also add a macro to calculate ticks to suspend from queue);
 
-    - higher priority task gets ready -> what will happen? (should be in documented)
-
-    - add mutexes
+    - document where higher priority tasks can get ready
 
     - revision of debug.c
 

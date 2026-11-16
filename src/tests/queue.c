@@ -3,9 +3,7 @@
 #define TEST_QUEUE_LEN 8
 #define RTOS_TEST_ITEMS 5
 
-static uint8_t test_queue_buffer[QUEUE_BUFFER_SIZE(sizeof(uint8_t), TEST_QUEUE_LEN)];
-static queue_t test_queue;
-static queue_t *tq_handle = &test_queue;
+static queue_handle_t tq_handle;
 
 static task_handle_t task_sender_handle;
 static task_handle_t task_receiver_handle;
@@ -15,15 +13,15 @@ static task_handle_t task_receiver_handle;
 // ============================================================================
 
 static void reset_test_queue(void) {
-    memset(test_queue_buffer, 0, sizeof(test_queue_buffer));
-    memset(&test_queue, 0, sizeof(test_queue));
-    queue_init(tq_handle, test_queue_buffer, sizeof(uint8_t), TEST_QUEUE_LEN);
+    memset(tq_handle->head, 0, QUEUE_BUFFER_SIZE(tq_handle->item_size, tq_handle->capacity));
+    memset(tq_handle, 0, sizeof(queue_t));
+    tq_handle = queue_init(sizeof(uint8_t), TEST_QUEUE_LEN);
 }
 
 // Test 1: Initialization and single send/pop
 void test_queue_single_send_pop(void) {
     reset_test_queue();
-
+    
     uint8_t val_in = 42;
     queue_send(tq_handle, &val_in);
 

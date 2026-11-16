@@ -1,9 +1,18 @@
 #include "queue.h"
-#include "core.h"
+#include <stdint.h>
 
 extern volatile tcb_t *current_tcb;
 
-void queue_init(queue_t *q, uint8_t *head, size_t item_size, uint8_t capacity) {
+queue_handle_t queue_init(size_t item_size, uint8_t capacity) {
+    queue_t *q = hmalloc(sizeof(queue_t));
+    uint8_t *head = hmalloc(QUEUE_BUFFER_SIZE(sizeof(uint8_t), capacity));
+    
+    if(q == NULL || head == NULL) {
+        hfree(q);
+        hfree(head);
+        return NULL;
+    }
+
     q->head = head;
     q->item_size = item_size;
     q->capacity = capacity;
@@ -13,6 +22,8 @@ void queue_init(queue_t *q, uint8_t *head, size_t item_size, uint8_t capacity) {
     q->popped_item_buffer = head + (capacity * item_size); 
 
     q->flag.count = &(q->count);
+
+    return (queue_handle_t)q; 
 }
 
 void bind_queue_to_task(queue_t *q, tcb_t *task) {

@@ -6,6 +6,7 @@
 
 #include "config.h"
 #include "core.h"
+#include "heap.h"
 
 // macro that will calculate size of queue buffer to allocate - exists to compensate for popped_item_buffer
 #define QUEUE_BUFFER_SIZE(item_size, capacity) \
@@ -22,7 +23,9 @@ typedef struct queue {
     flag_t flag;        // flag used by the scheduler to wake up tasks
 } queue_t;
 
-void queue_init(queue_t *q, uint8_t *head, size_t item_size, uint8_t capacity);
+typedef queue_t* queue_handle_t;
+
+queue_handle_t queue_init(size_t item_size, uint8_t capacity);
 
 void queue_send(queue_t *q, void *item_to_add);
 
