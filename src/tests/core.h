@@ -9,4 +9,8 @@
 
 void tests_core_blink(void);
 
+void tests_core_canary(void); 
+
+void tests_core_sp_overflow(void);
+
 #endif

@@ -1,10 +1,5 @@
 TODO:
     
-    - rewrite queue.c for it to require only one function to call for initialization 
-      and also there should not be type mess with queue item
-    
-    - clean up tests so they are not all over the place
-    
     - fix messy naming of core functions
     
     - add system ticks data type and counting (also add a macro to calculate ticks to suspend from queue);
