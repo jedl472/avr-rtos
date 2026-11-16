@@ -4,7 +4,6 @@
  * 
  * Great source https://silent-tower.net/projects/visual-overview-malloc
  *
- * @todo is very dumb right now, does not merge adjacement free blocks. WIP
  * @todo set H_HEAP_END to something else than RAMEND
  */
 
