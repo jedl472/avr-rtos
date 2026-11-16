@@ -94,7 +94,9 @@ typedef struct flag {
     uint8_t *count;
 } flag_t;
 
-// State of infividual tasks used by the schedulerl.
+/**
+ * @brief Task state used by the scheduler.
+ */
 typedef enum task_state {
     RUNNING,    // currently running
     READY,      // ready to run
@@ -123,22 +125,20 @@ typedef struct tcb {
 
 } tcb_t;
 
+/**
+ * @brief Pointer used to represent tasks.
+ */
 typedef tcb_t* task_handle_t;
 
-/**
- * @brief Pointer to the tcb of the currently running task. 
- *
- * Is exposed because some functions in debug.c use it.
- *
- * @todo unexpose or add a getter function.
- */
-extern volatile tcb_t *current_tcb;
 
 /**
  * @brief Yields the current task and calls the scheduler.
  */
 __attribute__((naked)) void task_yield(void);
 
+/**
+ * @brief Creates and registers a task, alongside with allocating its stack on the heap.
+ */
 task_handle_t task_create(task_priority_t priority, 
                           size_t stack_size, 
                           void (*fn)(void *), 
@@ -151,9 +151,12 @@ task_handle_t task_create(task_priority_t priority,
  */
 void task_suspend_ticks(tick_counter_t ticks);
 
+/**
+ * @brief Starts the scheduler.
+ *
+ * This function should be called last in main, because program never returns there.
+ */
 void os_start(void);
-
-void debug_register_task(tcb_t *task, uint8_t pos);
 
 /**
  * @brief Array of registered_tasks.
@@ -162,17 +165,23 @@ void debug_register_task(tcb_t *task, uint8_t pos);
  */
 extern tcb_t *registered_tasks[configMAX_TASKS];  // TODO remove
 
+/**
+ * @brief Kernel panic error codes.
+ */
 typedef enum kp_type {
     //core errors
-    STACK_OVERFLOW, // TODO
-    EXCEEDED_MAX_TASKS, // user error - means user tried to register more tasks than configMAX_TASKS
-    CORRUPTED_IDLE_TASK, // kernel error - means scheduler did not find suitable task to run
+    STACK_OVERFLOW,         //< Task run out of its stack space.
+    EXCEEDED_MAX_TASKS,     //< User tried to register more tasks than configMAX_TASKS.
+    CORRUPTED_IDLE_TASK,    //< Scheduler did not find a suitable task to run.
 
-    //queue errors
-    QUEUE_OVERFLOW, // user error - tried to queue_add on a full queue
-    POP_ON_EMPTY_QUEUE // kernel error - called queue_pop on an empty queue
+    //queue errors - TODO: should be hadled without throwing kp
+    QUEUE_OVERFLOW,         //< Tried to queue_add on a full queue.
+    POP_ON_EMPTY_QUEUE      //< Called queue_pop on an empty queue.
 } kp_type_t;
 
+/**
+ * @brief Throws a kernel panic error.
+ */
 void throw_kp(kp_type_t kp_type);
 
 #endif // !CORE_H
