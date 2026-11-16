@@ -5,21 +5,23 @@
 // private macros
 // ----------------------------------------
 
+// calculates comparision value for OCR2A
 // 64 means prescaler value (set in tick_isr_init)
 // example: 16MHz / 64 / 250 = 1000 Hz
 #define  CALCULATE_OCR2A(tick_frequency, cpu_frequency) \
     ((uint8_t)(cpu_frequency / tick_frequency / 64))
 
+// pushes everything onto stack
 #define SAVE_CONTEXT()                      \
 asm volatile(                               \
-    "push r0            \n\t"               \
-    "in   r0, __SREG__  \n\t"               \
-    "cli                \n\t"               \
+    "cli                \n\t" /* turn off interrupts, in case this is not called from ISR */ \
+    "push r0            \n\t"               \ 
+    "in   r0, __SREG__  \n\t" /* save sreg*/  \
     "set                \n\t"               \
-    "bld  r0, 7         \n\t" /* Ensure saved SREG keeps I-bit enabled */ \
+    "bld  r0, 7         \n\t" /* set enable interrpt bit in saved sreg to 1, to prevent restoring context with disabled interrupts */ \
     "push r0            \n\t"               \
     "push r1            \n\t"               \
-    "clr  r1            \n\t" /* C needs r1 == 0 */ \
+    "clr  r1            \n\t" /* C needs r1 to be 0 */ \
     "push r2  \n\t push r3  \n\t push r4  \n\t push r5  \n\t" \
     "push r6  \n\t push r7  \n\t push r8  \n\t push r9  \n\t" \
     "push r10 \n\t push r11 \n\t push r12 \n\t push r13 \n\t" \
@@ -28,7 +30,7 @@ asm volatile(                               \
     "push r22 \n\t push r23 \n\t push r24 \n\t push r25 \n\t" \
     "push r26 \n\t push r27 \n\t push r28 \n\t push r29 \n\t" \
     "push r30 \n\t push r31 \n\t"           \
-    "lds  r26, current_tcb   \n\t"          \
+    "lds  r26, current_tcb   \n\t" /*load new stack pointer into the tcb*/ \
     "lds  r27, current_tcb+1 \n\t"          \
     "in   r0, __SP_L__ \n\t"                \
     "st   X+, r0       \n\t"                \
@@ -36,9 +38,18 @@ asm volatile(                               \
     "st   X+, r0       \n\t"                \
 )
 
+/* Stack after calling SAVE_CONTEXT():
+ * ...
+ * task data
+ * ...
+ * R0
+ * SREG (with interrupt bit turned on)
+ * R1 - R31
+*/
+
 #define RESTORE_CONTEXT()                   \
 asm volatile(                               \
-    "lds  r26, current_tcb   \n\t"          \
+    "lds  r26, current_tcb   \n\t" /* loads new stack pointer from tcb */ \
     "lds  r27, current_tcb+1 \n\t"          \
     "ld   r28, X+      \n\t"                \
     "out  __SP_L__, r28 \n\t"               \
@@ -68,11 +79,13 @@ void check_stack_bounds(tcb_t *task);
 // globals
 // ----------------------------------------
 
+// currently running task
 volatile tcb_t *current_tcb;
 
 // array of all registered tasks in the system. MUST be sorted by priority from highest to due to tick ISR having to have small footprint
 tcb_t *registered_tasks[configMAX_TASKS] = {NULL};
 
+// elabpsed ticks (not accurate, can be skipped by critical sections)
 tick_counter_t os_ticks = 0;
 
 // ----------------------------------------
@@ -92,6 +105,7 @@ void idle_task(void *args) {
 // scheduler
 // ----------------------------------------
 
+// initializes the tick interrupt which runs the scheduler
 void tick_isr_init(void) { //inits timer2
     TCCR2A = (1 << WGM21);               // CTC mode
     TCCR2B = (1 << CS22);                // prescaler = 64
@@ -101,10 +115,8 @@ void tick_isr_init(void) { //inits timer2
     asm volatile("sei");
 }
 
-/* prerequisities for the scheduler to work: 
-        1. registered_tasks is sorted from highest priority
-*/
-
+// finds next suitable task to run by priority, if there is more than one of the same priority, does round robin
+// for the scheduler to work: 1. registered_tasks needs to be sorted from highest priority
 tcb_t *find_next_task(void) {
     // ------------------------ find the current RUNNING task ----------------------
     int8_t running_index = -1;
@@ -141,6 +153,7 @@ tcb_t *find_next_task(void) {
     return (tcb_t *)idle_task_handle;
 }
 
+
 void scheduler(void) {
     tcb_t *next_task = find_next_task();
     if(next_task != NULL) {
@@ -150,12 +163,13 @@ void scheduler(void) {
         current_tcb = next_task;
         current_tcb->state = RUNNING;
     } else {
-        // shouldn't be reachable, so being here means scheduler did not find READY idle tas
+        // shouldn't be reachable, so being here means scheduler did not find READY idle task
         throw_kp(CORRUPTED_IDLE_TASK);
     }
 
 }
 
+//updates timers on all suspended tasks and unblocks tasks wainting on flags
 void update_suspended_tasks(void) {
     for(int i = 0; i < configMAX_TASKS; i++) {
         if(registered_tasks[i] == NULL) break;
@@ -209,15 +223,12 @@ void task_suspend_ticks(tick_counter_t ticks) {
     task_yield();
 }
 
+// function where tasks that accidentally return land
 void task_exit(void) {
     current_tcb->state = FINISHED;      
     for (;;) {
         task_yield();                      
     }
-}
-
-void debug_register_task(tcb_t *task, uint8_t pos) {
-    registered_tasks[pos] = task;  // throws -Warray-bounds and that is perfectly fine
 }
 
 void check_stack_bounds(tcb_t *task) {
@@ -294,8 +305,8 @@ task_handle_t task_create(task_priority_t priority, size_t stack_size,
 
     // 1-2: where the task starts (what reti will load into the program counter)
     uint16_t start = (uint16_t)fn;
-    *sp-- = start & 0xFF;               // low byte, higher address
-    *sp-- = start >> 8;                 // high byte, lower address
+    *sp-- = start & 0xFF;
+    *sp-- = start >> 8;
 
     *sp-- = 0x00;                       // 3: r0
     *sp-- = 0x80;                       // 4: SREG, bit 7 = interrupts enabled
@@ -308,7 +319,7 @@ task_handle_t task_create(task_priority_t priority, size_t stack_size,
         else              *sp-- = 0x00;
     }
 
-    tcb->sp = sp;                         // next free box, as a real stack pointer would be
+    tcb->sp = sp;
     tcb->priority = priority;
     tcb->state = READY;
     tcb->ticks_remaining_suspended = 0;

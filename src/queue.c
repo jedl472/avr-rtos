@@ -1,6 +1,7 @@
 #include "queue.h"
 #include "core.h"
-#include "debug.h"
+
+extern volatile tcb_t *current_tcb;
 
 void queue_init(queue_t *q, uint8_t *head, size_t item_size, uint8_t capacity) {
     q->head = head;
