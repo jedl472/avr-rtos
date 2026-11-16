@@ -79,8 +79,7 @@ tick_counter_t os_ticks = 0;
 // idle task
 // ----------------------------------------
 
-static tcb_t idle_task_tcb;
-static uint8_t idle_task_stack[coreMINIMUM_STACK_SIZE];
+static task_handle_t idle_task_handle;
 
 void idle_task(void *args) {
     UNUSED(args);
@@ -139,7 +138,7 @@ tcb_t *find_next_task(void) {
     }
 
     // ------------------------ if no task is ready, return idle taks --------------
-    return &idle_task_tcb;
+    return (tcb_t *)idle_task_handle;
 }
 
 void scheduler(void) {
@@ -196,8 +195,7 @@ __attribute__((naked)) void start_first_task(void) {
 }
 
 void os_start(void) {
-    task_create(&idle_task_tcb, coreIDLE_TASK_PRIORITY, idle_task_stack, sizeof idle_task_stack, idle_task, NULL);    
-    task_register(&idle_task_tcb);
+    idle_task_handle = task_create(coreIDLE_TASK_PRIORITY, coreMINIMUM_STACK_SIZE, idle_task, NULL);    
 
     scheduler();
     tick_isr_init();
@@ -245,48 +243,9 @@ __attribute__((naked)) void task_yield(void) {
     asm volatile("ret");
 }
 
-void task_create(tcb_t *tcb, task_priority_t priority, uint8_t *stack, uint16_t size,
-                 void (*fn)(void *), void *arg) {
-    
-    uint8_t *sp = stack + size - 1;     // highest box of the stack array
-
-    // if the task function ever returns, land in task_exit
-    uint16_t exit_addr = (uint16_t)task_exit;
-    *sp-- = exit_addr & 0xFF;
-    *sp-- = exit_addr >> 8;
-
-    // 1-2: where the task starts (what reti will load into the program counter)
-    uint16_t start = (uint16_t)fn;
-    *sp-- = start & 0xFF;               // low byte, higher address
-    *sp-- = start >> 8;                 // high byte, lower address
-
-    *sp-- = 0x00;                       // 3: r0
-    *sp-- = 0x80;                       // 4: SREG, bit 7 = interrupts enabled
-    *sp-- = 0x00;                       // 5: r1, must be zero for C code
-
-    for (uint8_t r = 2; r <= 31; r++) { // 6: r2 ... r31
-        uint16_t a = (uint16_t)arg;
-        if      (r == 24) *sp-- = a & 0xFF;   // first argument, low byte
-        else if (r == 25) *sp-- = a >> 8;     // first argument, high byte
-        else              *sp-- = 0x00;
-    }
-
-    tcb->sp = sp;                         // next free box, as a real stack pointer would be
-    tcb->priority = priority;
-    tcb->state = READY;
-    tcb->ticks_remaining_suspended = 0;
-
-    tcb->stack_size = size;
-    tcb->stack_base = stack;
-
-    *stack = coreSTACK_CANARY_VALUE; // stack canary setup - the only place where that address should be written to
-}
-
-
 void task_register(tcb_t *tcb) {
-    // debug_USART_print("registering task of priority: ");
-    // debug_USART_transmit(tcb->priority + '0');
-    // debug_USART_print("\n");
+    coreENTER_CRITICAL();
+
     if (registered_tasks[configMAX_TASKS - 1] != NULL) throw_kp(EXCEEDED_MAX_TASKS);
     
     if (registered_tasks[0] == NULL) {
@@ -307,7 +266,66 @@ void task_register(tcb_t *tcb) {
     }
 
     registered_tasks[pos] = tcb;
+    
+    coreEXIT_CRITICAL();
 }
+
+task_handle_t task_create(task_priority_t priority, size_t stack_size,
+                    void (*fn)(void *), void *arg) {
+    
+    tcb_t *tcb = (tcb_t*)hmalloc(sizeof(tcb_t));
+    
+    if (tcb == NULL || stack_size < coreMINIMUM_STACK_SIZE) {
+        return NULL; // failed to allocate space for tcb or 
+    }
+
+    // Allocate the task's private stack buffer on the custom heap
+    uint8_t *stack = (uint8_t *)hmalloc(stack_size);
+    if (stack == NULL) {
+        return NULL; // Out of heap memory
+    }
+
+    uint8_t *sp = stack + stack_size - 1;     // highest box of the stack array
+
+    // if the task function ever returns, land in task_exit
+    uint16_t exit_addr = (uint16_t)task_exit;
+    *sp-- = exit_addr & 0xFF;
+    *sp-- = exit_addr >> 8;
+
+    // 1-2: where the task starts (what reti will load into the program counter)
+    uint16_t start = (uint16_t)fn;
+    *sp-- = start & 0xFF;               // low byte, higher address
+    *sp-- = start >> 8;                 // high byte, lower address
+
+    *sp-- = 0x00;                       // 3: r0
+    *sp-- = 0x80;                       // 4: SREG, bit 7 = interrupts enabled
+    *sp-- = 0x00;                       // 5: r1, must be zero for C code
+
+    uint16_t a = (uint16_t)arg;
+    for (uint8_t r = 2; r <= 31; r++) { // 6: r2 ... r31
+        if      (r == 24) *sp-- = a & 0xFF;   // first argument, low byte
+        else if (r == 25) *sp-- = a >> 8;     // first argument, high byte
+        else              *sp-- = 0x00;
+    }
+
+    tcb->sp = sp;                         // next free box, as a real stack pointer would be
+    tcb->priority = priority;
+    tcb->state = READY;
+    tcb->ticks_remaining_suspended = 0;
+
+    tcb->stack_size = stack_size;
+    tcb->stack_base = stack;
+
+    *stack = coreSTACK_CANARY_VALUE; // stack canary setup - the only place where that address should be written to
+    
+
+    task_register(tcb);
+
+
+    return (task_handle_t)tcb;
+}
+
+
 
 // ----------------------------------------
 // error handling

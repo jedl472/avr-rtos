@@ -16,6 +16,7 @@
 #include <avr/interrupt.h>
 
 #include "debug.h"
+#include "heap.h"
 #include "config.h"
 
 /**
@@ -71,6 +72,7 @@ typedef int8_t task_priority_t;
  */
 typedef uint16_t tick_counter_t;
 
+
 /**
  * @brief Ticks elapsed from os_start.
  *
@@ -121,6 +123,8 @@ typedef struct tcb {
 
 } tcb_t;
 
+typedef tcb_t* task_handle_t;
+
 /**
  * @brief Pointer to the tcb of the currently running task. 
  *
@@ -135,9 +139,10 @@ extern volatile tcb_t *current_tcb;
  */
 __attribute__((naked)) void task_yield(void);
 
-void task_create(tcb_t *t, task_priority_t priority, uint8_t *stack, 
-                    uint16_t size, void (*fn)(void *), void *arg);
-
+task_handle_t task_create(task_priority_t priority, 
+                          size_t stack_size, 
+                          void (*fn)(void *), 
+                          void *arg);
 /**
  * @brief Suspends currently running taks for a number of OS ticks.
  *
@@ -149,8 +154,6 @@ void task_suspend_ticks(tick_counter_t ticks);
 void os_start(void);
 
 void debug_register_task(tcb_t *task, uint8_t pos);
-
-void task_register(tcb_t *tcb);
 
 /**
  * @brief Array of registered_tasks.

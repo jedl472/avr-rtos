@@ -7,10 +7,8 @@ static uint8_t test_queue_buffer[QUEUE_BUFFER_SIZE(sizeof(uint8_t), TEST_QUEUE_L
 static queue_t test_queue;
 static queue_t *tq_handle = &test_queue;
 
-static tcb_t task_sender_tcb;
-static tcb_t task_receiver_tcb;
-static uint8_t task_sender_stack[coreMINIMUM_STACK_SIZE];
-static uint8_t task_receiver_stack[coreMINIMUM_STACK_SIZE];
+static task_handle_t task_sender_handle;
+static task_handle_t task_receiver_handle;
 
 // ============================================================================
 // PART 1: Synchronous Unit Tests (Run before os_start)
@@ -67,7 +65,7 @@ void task_sender(void *args) {
 
     while (i <= RTOS_TEST_ITEMS) {
         // Verify receiver is blocked on this queue's flag before sending
-        TEST_ASSERT(task_receiver_tcb.waiting_on_flag != NULL,
+        TEST_ASSERT(task_receiver_handle->waiting_on_flag != NULL,
                     "T4.x: Receiver TCB is waiting on queue flag before send");
 
         coreENTER_CRITICAL();
@@ -128,11 +126,9 @@ void tests_queue_runall(void) {
     // 2. Re-initialize queue and start RTOS task blocking tests
     reset_test_queue();
 
-    task_create(&task_sender_tcb, 0, task_sender_stack, sizeof(task_sender_stack), task_sender, NULL);
-    task_register(&task_sender_tcb);
+    task_sender_handle = task_create(0, coreMINIMUM_STACK_SIZE, task_sender, NULL);
 
-    task_create(&task_receiver_tcb, 0, task_receiver_stack, sizeof(task_receiver_stack), task_receiver, NULL);
-    task_register(&task_receiver_tcb);
+    task_receiver_handle = task_create(0, coreMINIMUM_STACK_SIZE, task_receiver, NULL);
 
     os_start();
 }

@@ -12,7 +12,6 @@ default:
 		src/debug.c \
 		src/core.c  \
 		src/queue.c	\
-		src/tests.c \
 		src/heap.c  \
 		src/tests/queue.c \
 		src/tests/heap.c \
