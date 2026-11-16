@@ -1,9 +1,6 @@
-
-
 #include "debug.h"
-
-#include "core.h"
 #include "tests/queue.h"
+#include "tests/heap.h"
 
 //
 // static tcb_t   blink_task_tcb;
@@ -23,6 +20,9 @@
 
 int main(void)
 {
+    debug_USART_init(CALCULATE_UBRR(9600));
+    debug_USART_print("========== main start ===========\n");
+    tests_heap_runall();
     tests_queue_runall();
     // //debug init
     // DDRB |= (1 << PB5);  // PB0 output

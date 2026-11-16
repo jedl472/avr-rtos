@@ -1,67 +1,138 @@
 #include "queue.h"
 
+#define TEST_QUEUE_LEN 8
+#define RTOS_TEST_ITEMS 5
 
-static uint8_t test_queue_buffer[QUEUE_BUFFER_SIZE(sizeof(uint8_t), 8)];
+static uint8_t test_queue_buffer[QUEUE_BUFFER_SIZE(sizeof(uint8_t), TEST_QUEUE_LEN)];
 static queue_t test_queue;
+static queue_t *tq_handle = &test_queue;
 
 static tcb_t task_sender_tcb;
 static tcb_t task_receiver_tcb;
 static uint8_t task_sender_stack[coreMINIMUM_STACK_SIZE];
 static uint8_t task_receiver_stack[coreMINIMUM_STACK_SIZE];
 
-queue_t *tq_handle = &test_queue;
+// ============================================================================
+// PART 1: Synchronous Unit Tests (Run before os_start)
+// ============================================================================
+
+static void reset_test_queue(void) {
+    memset(test_queue_buffer, 0, sizeof(test_queue_buffer));
+    memset(&test_queue, 0, sizeof(test_queue));
+    queue_init(tq_handle, test_queue_buffer, sizeof(uint8_t), TEST_QUEUE_LEN);
+}
+
+// Test 1: Initialization and single send/pop
+void test_queue_single_send_pop(void) {
+    reset_test_queue();
+
+    uint8_t val_in = 42;
+    queue_send(tq_handle, &val_in);
+
+    void *res = queue_pop(tq_handle);
+    uint8_t val_out = *(tq_handle->popped_item_buffer);
+
+    TEST_ASSERT(res != NULL, "T1.1: queue_pop returns non-NULL after send");
+    TEST_ASSERT(val_out == 42, "T1.2: Popped value matches sent value (42)");
+}
+
+// Test 2: FIFO ordering and full capacity (8 items)
+void test_queue_fifo_order(void) {
+    reset_test_queue();
+
+    for (uint8_t i = 0; i < TEST_QUEUE_LEN; i++) {
+        uint8_t val = i + 10;
+        queue_send(tq_handle, &val);
+    }
+
+    uint8_t fifo_ok = 1;
+    for (uint8_t i = 0; i < TEST_QUEUE_LEN; i++) {
+        queue_pop(tq_handle);
+        uint8_t popped = *(tq_handle->popped_item_buffer);
+        if (popped != (uint8_t)(i + 10)) {
+            fifo_ok = 0;
+        }
+    }
+
+    TEST_ASSERT(fifo_ok == 1, "T2.1: Queue preserves FIFO order across full capacity");
+}
+
+// ============================================================================
+// PART 2: Multi-Task RTOS Blocking & Wakeup Tests
+// ============================================================================
 
 void task_sender(void *args) {
-    uint8_t i = 0;
+    (void)args;
+    uint8_t i = 1;
 
-    while(1) {
+    while (i <= RTOS_TEST_ITEMS) {
+        // Verify receiver is blocked on this queue's flag before sending
+        TEST_ASSERT(task_receiver_tcb.waiting_on_flag != NULL,
+                    "T4.x: Receiver TCB is waiting on queue flag before send");
+
         coreENTER_CRITICAL();
         queue_send(tq_handle, &i);
         coreEXIT_CRITICAL();
-        debug_USART_print("sending data to queue\n waiting_on_flag val: ");
-        debug_USART_print_int(*task_receiver_tcb.waiting_on_flag->count);
-        debug_USART_print("\n");
-        i++; 
-        task_suspend_ticks(500);
 
+        i++;
+        task_suspend_ticks(500);
     }
 
+    // Sender finished its test burst; suspend indefinitely
+    while (1) {
+        task_suspend_ticks(1000);
+    }
 }
 
 void task_receiver(void *args) {
-    debug_USART_print("first run of task_receiver\n");
-    uint8_t qpop;
-    while (1) {
+    (void)args;
+    uint8_t expected = 1;
+    uint8_t all_received_ok = 1;
+
+    while (expected <= RTOS_TEST_ITEMS) {
         suspend_until_queue_receive(tq_handle);
-        debug_USART_print("task_receiver woke up hoooooooooooooray\n");
-        void *_ = queue_pop(tq_handle);
-        qpop = *(tq_handle->popped_item_buffer);
-        
-        debug_USART_print("popped queue value: ");
-        debug_USART_print_int(qpop);
-        debug_USART_print("\n");
+
+        void *res = queue_pop(tq_handle);
+        uint8_t qpop = *(tq_handle->popped_item_buffer);
+
+        if (res == NULL || qpop != expected) {
+            all_received_ok = 0;
+        }
+        expected++;
+    }
+
+    TEST_ASSERT(all_received_ok == 1,
+                "T4.Final: task_receiver woke up and popped all expected items in order");
+
+    // Print final test summary once RTOS test completes
+    tests_print_str("=== Queue Tests Summary: ");
+    tests_print_dec(tests_run - tests_failed);
+    tests_print_str("/");
+    tests_print_dec(tests_run);
+    tests_print_str(" passed ===\n");
+
+    while (1) {
+        task_suspend_ticks(1000);
     }
 }
 
-void tests_queue_runall() {
-    debug_USART_init(CALCULATE_UBRR(9600));
+void tests_queue_runall(void) {
+    TEST_INIT();
 
-    debug_USART_print("\n------ starting queue test block ------\n");
-    
-    queue_init(tq_handle, test_queue_buffer, sizeof(uint8_t), 8);
-    
+    tests_print_str("\n=== Starting Queue Tests ===\n");
+
+    // 1. Run synchronous queue logic tests
+    test_queue_single_send_pop();
+    test_queue_fifo_order();
+
+    // 2. Re-initialize queue and start RTOS task blocking tests
+    reset_test_queue();
+
     task_create(&task_sender_tcb, 0, task_sender_stack, sizeof(task_sender_stack), task_sender, NULL);
     task_register(&task_sender_tcb);
+
     task_create(&task_receiver_tcb, 0, task_receiver_stack, sizeof(task_receiver_stack), task_receiver, NULL);
     task_register(&task_receiver_tcb);
 
     os_start();
-
-    // test_queue.count = 0;
-    // task_receiver_tcb.waiting_on_flag = &(test_queue.flag);
-    //
-    // queue_pop(&test_queue);
-    //
-    // debug_USART_print_int(*(task_receiver_tcb.waiting_on_flag->count));
-    
 }

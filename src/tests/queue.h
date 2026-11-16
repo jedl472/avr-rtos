@@ -3,7 +3,7 @@
 
 #include "../core.h"
 #include "../queue.h"
-#include "../debug.h"
+#include "tests.h"
 
 void tests_queue_runall(void);
 
